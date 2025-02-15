@@ -1,7 +1,8 @@
 {
   /**
     This implementation assumes:
-1. Frontend provides a UI for manufacturers to initiate robot setup
+1. Frontend provides a UI for manufacturers to initiate robot setup --
+             need to change this so that it is handeled in email modal in canvas
 2. Backend handles the UiPath Orchestrator API integration -uipathServices.js
 3. Pre-built workflow packages are stored and injected with dynamic email
 UiPath cloud API endpoints are properly configured
