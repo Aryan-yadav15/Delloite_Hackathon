@@ -1,11 +1,11 @@
 'use client'
 
-import { useSession } from "next-auth/react"
+import { useUser } from "@clerk/nextjs"
 import { useEffect, useState } from "react"
 import { useSupabase } from "@/lib/supabase"
 
 export default function OrdersPage() {
-  const { data: session } = useSession()
+  const { user } = useUser()
   const [orders, setOrders] = useState([])
   const supabase = useSupabase()
 
@@ -18,7 +18,7 @@ export default function OrdersPage() {
           retailer:retailers(business_name, email),
           items:order_items(*)
         `)
-        .eq('manufacturer_id', session.user.id)
+        .eq('manufacturer_id', user.id)
         .order('created_at', { ascending: false })
 
       if (!error) {
@@ -26,10 +26,10 @@ export default function OrdersPage() {
       }
     }
 
-    if (session?.user) {
+    if (user) {
       fetchOrders()
     }
-  }, [session])
+  }, [user])
 
   return (
     <div>
