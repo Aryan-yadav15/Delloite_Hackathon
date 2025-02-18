@@ -11,6 +11,7 @@ import logsRouter from "./api/routes/logs.js";
 import invoicesRouter from "./api/routes/invoices.js";
 import notificationsRouter from "./api/routes/notifications.js";
 import validationRouter from "./api/routes/validation.js";
+import testRouter from "./api/routes/test.js";
 
 dotenv.config();
 
@@ -38,6 +39,7 @@ app.use("/api/logs", logsRouter);
 app.use("/api/invoices", invoicesRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/validation", validationRouter);
+app.use('/api', testRouter);
 
 // Error handling
 app.use((err, req, res, next) => {

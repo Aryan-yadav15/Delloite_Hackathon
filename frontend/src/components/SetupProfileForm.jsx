@@ -21,13 +21,17 @@ export default function SetupProfileForm() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          company_name: companyName
+          company_name: companyName,
+          clerk_id: user.id // Send Clerk user ID
         })
       })
 
       const data = await response.json()
 
       if (!response.ok) {
+        if (response.status === 409) {
+          throw new Error('Company name already exists. Please choose another name.')
+        }
         throw new Error(data.error || data.details || 'Failed to create manufacturer profile')
       }
 

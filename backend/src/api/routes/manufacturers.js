@@ -40,4 +40,46 @@ router.get('/:id/retailers', async (req, res) => {
     }
 });
 
+router.post('/', async (req, res) => {
+  try {
+    const { company_name, clerk_id } = req.body
+
+    // Check for existing manufacturer
+    const { data: existing, error: lookupError } = await supabase
+      .from('manufacturers')
+      .select('id')
+      .or(`company_name.eq.${company_name},clerk_id.eq.${clerk_id}`)
+
+    if (lookupError) throw lookupError
+    if (existing.length > 0) {
+      return res.status(409).json({
+        error: 'Manufacturer already exists',
+        details: existing[0].clerk_id === clerk_id ? 
+          'User already has a manufacturer profile' : 
+          'Company name is already taken'
+      })
+    }
+
+    // Create new manufacturer
+    const { data, error } = await supabase
+      .from('manufacturers')
+      .insert([{
+        company_name,
+        clerk_id,
+        email: req.user.email // Get email from auth
+      }])
+      .select()
+
+    if (error) throw error
+    
+    res.json(data[0])
+  } catch (error) {
+    console.error('Manufacturer creation error:', error)
+    res.status(500).json({ 
+      error: error.message,
+      details: error.details 
+    })
+  }
+})
+
 export default router; 

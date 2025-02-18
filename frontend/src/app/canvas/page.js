@@ -122,7 +122,6 @@ export default function Page() {
 
       const type = event.dataTransfer.getData("application/reactflow");
       const reactFlowBounds = document.querySelector(".react-flow").getBoundingClientRect();
-      const { manufacturer } = useManufacturer();
 
       const position = {
         x: event.clientX - reactFlowBounds.left - 90,
@@ -149,7 +148,7 @@ export default function Page() {
         return updatedNodes;
       });
     },
-    [setNodes]
+    [manufacturer]
   );
 
   const onNodeClick = useCallback((event, node) => {
