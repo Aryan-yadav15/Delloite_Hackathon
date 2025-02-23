@@ -21,7 +21,10 @@ const app = express();
 app.use(cors({
   origin: process.env.FRONTEND_URL || "http://localhost:3000",
 }));
-app.use(express.json());
+app.use(express.json({ 
+    type: ['application/json', 'text/plain'] // Accept both JSON and plain text
+}));
+app.use(express.urlencoded({ extended: true })); // Handle URL-encoded bodies
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {

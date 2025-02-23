@@ -1,9 +1,11 @@
 create table oauth_tokens (
   id uuid primary key default gen_random_uuid(),
   email text not null,
-  access_token text,
+  access_token text not null,
   refresh_token text not null,
-  expires_at timestamptz,
+  token_type text,
+  scope text,
+  expires_in integer,
   created_at timestamptz not null default now()
 );
 
