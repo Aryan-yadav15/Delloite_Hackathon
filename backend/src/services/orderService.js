@@ -1,70 +1,108 @@
 import supabase from '../db/index.js';
 
-class OrderService {
-  /**
-   * Process structured data from ML model/UiPath
-   * @param {Object} data - Structured order data
-   * @returns {Promise<Object>} Processing result
-   */
-  async processOrder(data) {
-    try {
-      // Validate required fields
-      if (!data.email_from || !data.email_subject) {
-        throw new Error('Missing required fields');
-      }
+export async function createOrder(orderData) {
+    const { emailMetadata, orderDetails } = orderData;
 
-      // TODO: In future, get user_id from UiPath agent mapping
-      // For now, we'll use a test user_id
-      const testUserId = '123e4567-e89b-12d3-a456-426614174000';
+    // Manufacturer lookup
+    const { data: manufacturer, error: mError } = await supabase
+        .from('manufacturers')
+        .select('id')
+        .eq('email', emailMetadata.to)
+        .single();
 
-      // Create order record
-      const { data: order, error } = await supabase
+    if (mError || !manufacturer) {
+        throw new Error(`Manufacturer lookup failed: ${mError?.message || 'Not found'}`);
+    }
+
+    // Retailer lookup
+    const { data: retailer, error: rError } = await supabase
+        .from('retailers')
+        .select('id')
+        .eq('email', emailMetadata.from)
+        .single();
+
+    if (rError || !retailer) {
+        throw new Error(`Retailer lookup failed: ${rError?.message || 'Not found'}`);
+    }
+
+    // Create order
+    const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
-          user_id: testUserId,
-          email_from: data.email_from,
-          email_subject: data.email_subject,
-          email_received_at: new Date(),
-          order_status: 'processed',
-          processed_data: data, // Store full structured data in JSONB
+            manufacturer_id: manufacturer.id,
+            retailer_id: retailer.id,
+            order_number: `ORD-${Date.now()}`,
+            email_subject: emailMetadata.subject,
+            email_body: JSON.stringify(orderData),
+            email_received_at: new Date(emailMetadata.timestamp),
+            processing_status: 'pending',
+            email_parsed_data: orderData,
+            created_at: new Date(),
+            updated_at: new Date()
         })
         .select()
         .single();
 
-      if (error) throw error;
-
-      return {
-        success: true,
-        message: 'Order processed successfully',
-        order
-      };
-
-    } catch (error) {
-      console.error('Error processing order:', error);
-      
-      // If this was a database error, we might want to store the failed order
-      try {
-        await supabase
-          .from('orders')
-          .insert({
-            user_id: testUserId,
-            email_from: data.email_from || 'unknown',
-            email_subject: data.email_subject || 'unknown',
-            email_received_at: new Date(),
-            order_status: 'error',
-            error_message: error.message,
-            processed_data: data
-          });
-      } catch (dbError) {
-        console.error('Error logging failed order:', dbError);
-      }
-
-      return {
-        success: false,
-        error: error.message
-      };
+    if (orderError) {
+        throw new Error(`Order creation failed: ${orderError.message}`);
     }
-  }
-}
 
-export default new OrderService(); 
+    // Process order items
+    const orderItemsPromises = Object.entries(orderDetails.products).map(async ([productName, quantity]) => {
+        // Look up product by name for this manufacturer
+        const { data: product, error: productError } = await supabase
+            .from('products')
+            .select('id, price')
+            .eq('manufacturer_id', manufacturer.id)
+            .eq('name', productName)
+            .single();
+
+        if (productError || !product) {
+            console.warn(`Product not found: ${productName}`);
+            return null;
+        }
+
+        const qty = parseInt(quantity.replace(/\D/g, ''));
+        return {
+            order_id: order.id,
+            product_id: product.id,
+            quantity: qty,
+            unit_price: product.price,
+            total_price: product.price * qty,
+            created_at: new Date()
+        };
+    });
+
+    // Wait for all product lookups and create order items
+    const orderItems = (await Promise.all(orderItemsPromises)).filter(Boolean);
+
+    if (orderItems.length === 0) {
+        throw new Error('No valid products found for order items');
+    }
+
+    const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+    if (itemsError) {
+        throw new Error(`Order items creation failed: ${itemsError.message}`);
+    }
+
+    // Update order total amount
+    const totalAmount = orderItems.reduce((sum, item) => sum + Number(item.total_price), 0);
+    
+    const { error: updateError } = await supabase
+        .from('orders')
+        .update({ total_amount: totalAmount })
+        .eq('id', order.id);
+
+    if (updateError) {
+        console.error('Failed to update order total:', updateError);
+    }
+
+    return {
+        orderId: order.id,
+        itemsCount: orderItems.length,
+        totalAmount
+    };
+} 

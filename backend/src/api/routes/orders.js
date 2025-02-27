@@ -25,79 +25,118 @@ const orderSchema = z.object({
 // Create new order
 router.post('/', async (req, res) => {
   try {
-    // Validate request body
-    const validatedData = orderSchema.parse(req.body);
+    console.log('➡️ Received POST to /api/orders');
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
 
-    // Find manufacturer and retailer by email
+    const { emailMetadata, orderDetails } = req.body;
+    
+    if (!emailMetadata || !orderDetails) {
+      console.error('❌ Missing required data:', { emailMetadata, orderDetails });
+      return res.status(400).json({
+        error: 'Invalid request structure - missing emailMetadata or orderDetails'
+      });
+    }
+
+    console.log('📧 Email metadata:', emailMetadata);
+    console.log('📦 Order details:', orderDetails);
+
+    // Manufacturer lookup
+    console.log(`🔍 Looking up manufacturer with email: ${emailMetadata.to}`);
     const { data: manufacturer, error: mError } = await supabase
       .from('manufacturers')
       .select('id')
-      .eq('email', validatedData.manufacturer_email)
+      .eq('email', emailMetadata.to)
       .single();
 
-    if (mError) throw new Error('Manufacturer not found');
+    console.log('Manufacturer lookup result:', { manufacturer, mError });
+    if (mError || !manufacturer) {
+      console.error('❌ Manufacturer lookup failed:', mError || 'Not found');
+      return res.status(400).json({
+        error: `Manufacturer lookup failed: ${mError?.message || 'Not found'}`
+      });
+    }
 
+    // Retailer lookup
+    console.log(`🔍 Looking up retailer with email: ${emailMetadata.from}`);
     const { data: retailer, error: rError } = await supabase
       .from('retailers')
       .select('id')
-      .eq('email', validatedData.retailer_email)
+      .eq('email', emailMetadata.from)
       .single();
 
-    if (rError) throw new Error('Retailer not found');
+    console.log('Retailer lookup result:', { retailer, rError });
+    if (rError || !retailer) {
+      throw new Error(`Retailer lookup failed: ${rError?.message || 'Not found'}`);
+    }
 
     // Create order
+    console.log('🛒 Creating order...');
+    const orderPayload = {
+      manufacturer_id: manufacturer.id,
+      retailer_id: retailer.id,
+      order_number: `ORD-${Date.now()}`,
+      email_subject: emailMetadata.subject,
+      email_body: JSON.stringify(req.body),
+      email_received_at: new Date(emailMetadata.timestamp),
+      processing_status: 'pending',
+      email_parsed_data: req.body,
+      created_at: new Date(),
+      updated_at: new Date()
+    };
+    
+    console.log('Order payload:', orderPayload);
     const { data: order, error: orderError } = await supabase
       .from('orders')
-      .insert([
-        {
-          order_number: validatedData.order_number,
-          order_date: validatedData.order_date,
-          manufacturer_id: manufacturer.id,
-          retailer_id: retailer.id,
-          po_document_url: validatedData.po_document_url,
-          additional_notes: validatedData.additional_notes,
-          status: 'PENDING'
-        }
-      ])
+      .insert(orderPayload)
       .select()
       .single();
 
-    if (orderError) throw orderError;
+    console.log('Order creation result:', { order, orderError });
+    if (orderError) {
+      throw new Error(`Order creation failed: ${orderError.message}`);
+    }
 
-    // Create order products
-    const orderProducts = validatedData.products.map(product => ({
-      order_id: order.id,
-      sku: product.sku,
-      quantity: product.quantity,
-      unit_price: product.unit_price,
-      description: product.description
-    }));
+    // Create order items
+    console.log('📦 Creating order items...');
+    const orderItems = Object.entries(orderDetails.products).map(([productName, quantity]) => {
+      const qty = parseInt(quantity.replace(/\D/g, ''));
+      if (isNaN(qty)) {
+        console.warn(`⚠️ Invalid quantity for ${productName}: ${quantity}`);
+        return null;
+      }
+      
+      return {
+        order_id: order.id,
+        product_name: productName,
+        quantity: qty,
+        created_at: new Date()
+      };
+    }).filter(Boolean);
 
-    const { error: productsError } = await supabase
-      .from('order_products')
-      .insert(orderProducts);
+    console.log('Order items payload:', orderItems);
+    const { error: itemsError } = await supabase
+      .from('order_items')
+      .insert(orderItems);
 
-    if (productsError) throw productsError;
+    if (itemsError) {
+      console.error('❌ Order items error:', itemsError);
+      throw new Error(`Partial failure: Order created but items failed (${itemsError.message})`);
+    }
 
-    // Fetch complete order with relationships
-    const { data: completeOrder, error: fetchError } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        manufacturer:manufacturers (name, email),
-        retailer:retailers (name, email),
-        order_products (*)
-      `)
-      .eq('id', order.id)
-      .single();
-
-    if (fetchError) throw fetchError;
-
-    res.status(201).json(completeOrder);
+    console.log('✅ Order processed successfully');
+    return res.status(200).json({
+      success: true,
+      orderId: order.id,
+      itemsCount: orderItems.length
+    });
 
   } catch (error) {
-    console.error('Order creation error:', error);
-    res.status(400).json({ error: error.message });
+    console.error('‼️ Critical error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
