@@ -7,6 +7,9 @@ const nextConfig = {
       ...config.resolve.alias,
       '@': path.resolve(__dirname, './src'),
     }
+
+    config.externals = config.externals || [];
+    
     return config
   }
 };

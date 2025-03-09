@@ -8,8 +8,9 @@ const supabaseClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 )
 
-// Export the client for client components
+// Export as both named export and default
 export const supabase = supabaseClient
+export default supabaseClient
 
 // Hook for client components
 export const useSupabase = () => {

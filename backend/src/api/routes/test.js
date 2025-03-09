@@ -59,7 +59,8 @@ router.post('/test', async (req, res) => {
                     return acc;
                 }, {}),
                 specialRequest: parsedOrder.flag === 1
-            }
+            },
+            emailContent: emailDetails // Pass the full email body
         };
 
         console.log('Final response:', finalResponse);

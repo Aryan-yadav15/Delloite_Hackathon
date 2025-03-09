@@ -54,14 +54,14 @@ function findQuantities(text) {
     return Array.from(text.matchAll(quantPattern)).map(match => match[0]);
 }
 
-function parseOrder(text) {
+function parseOrder(emailContent) {
     try {
         // Find product matches with their positions
-        const productMatches = findProductMatches(text);
+        const productMatches = findProductMatches(emailContent);
         
         // Remove matched products from text
         const textWithoutProducts = removeSubstrings(
-            text, 
+            emailContent, 
             productMatches
         );
         
@@ -76,10 +76,16 @@ function parseOrder(text) {
             }
         });
         
-        // Add flag
-        output.flag = 0;
+        // Add logic to detect special requests from keywords in the email content
+        const hasSpecialRequest = emailContent.toLowerCase().includes('special request') || 
+                                 emailContent.toLowerCase().includes('custom order') ||
+                                 emailContent.toLowerCase().includes('specific requirements');
         
-        return output;
+        // Return parsed data with flag
+        return {
+            ...output,
+            flag: hasSpecialRequest ? 1 : 0
+        };
     } catch (error) {
         console.error('Error parsing order:', error);
         return { flag: 1, error: error.message };

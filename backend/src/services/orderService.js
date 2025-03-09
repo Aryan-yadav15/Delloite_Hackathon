@@ -1,108 +1,113 @@
 import supabase from '../db/index.js';
+import { v4 as uuidv4 } from 'uuid';
 
-export async function createOrder(orderData) {
-    const { emailMetadata, orderDetails } = orderData;
+export async function createOrder(parsedData) {
+    const { emailMetadata, orderDetails } = parsedData;
 
-    // Manufacturer lookup
-    const { data: manufacturer, error: mError } = await supabase
-        .from('manufacturers')
-        .select('id')
-        .eq('email', emailMetadata.to)
-        .single();
+    // Extract retailer email
+    const retailerEmail = emailMetadata.from;
 
-    if (mError || !manufacturer) {
-        throw new Error(`Manufacturer lookup failed: ${mError?.message || 'Not found'}`);
-    }
-
-    // Retailer lookup
-    const { data: retailer, error: rError } = await supabase
+    // Find the retailer by email, case-insensitive
+    const { data: retailerData, error: retailerError } = await supabase
         .from('retailers')
-        .select('id')
-        .eq('email', emailMetadata.from)
+        .select('id, manufacturer_id')
+        .ilike('email', retailerEmail.trim())
         .single();
 
-    if (rError || !retailer) {
-        throw new Error(`Retailer lookup failed: ${rError?.message || 'Not found'}`);
+    if (retailerError) {
+        throw new Error(`Retailer not found: ${retailerError.message}`);
     }
 
-    // Create order
-    const { data: order, error: orderError } = await supabase
+    const retailerId = retailerData.id;
+    const manufacturerId = retailerData.manufacturer_id;
+
+    // Create a new order number
+    const orderNumber = `ORD-${Date.now().toString().slice(-6)}`;
+
+    // Calculate product count and parse quantities
+    let totalAmount = 0;
+    const itemsForInsert = [];
+
+    // Process product items
+    for (const [productName, quantityStr] of Object.entries(orderDetails.products)) {
+        // Extract numeric quantity
+        const quantity = parseInt(quantityStr.replace(/[^0-9]/g, ''));
+
+        // Find product with a more flexible query
+        const { data: productData, error: productError } = await supabase
+            .from('products')
+            .select('id, price, name')
+            .ilike('name', productName.trim()) // Case-insensitive search
+            .eq('manufacturer_id', manufacturerId);
+
+        // If exact match fails, log and continue
+        if (productError || !productData || productData.length === 0) {
+            console.log(`Debug - Product not found: "${productName}" - Manufacturer ID: ${manufacturerId}`);
+            continue; // Skip this product instead of failing the whole order
+        }
+
+        // Use the first matching product
+        const productId = productData[0].id;
+        const price = productData[0].price;
+        console.log(`Debug - Product matched: "${productData[0].name}" (ID: ${productId})`);
+
+        // Add to order items
+        itemsForInsert.push({
+            product_id: productId,
+            quantity,
+            unit_price: price,
+            total_price: quantity * price
+        });
+
+        totalAmount += quantity * price;
+    }
+
+    // Insert order with special request flag and email body
+    const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .insert({
-            manufacturer_id: manufacturer.id,
-            retailer_id: retailer.id,
-            order_number: `ORD-${Date.now()}`,
-            email_subject: emailMetadata.subject,
-            email_body: JSON.stringify(orderData),
-            email_received_at: new Date(emailMetadata.timestamp),
+            order_number: orderNumber,
+            retailer_id: retailerId,
+            manufacturer_id: manufacturerId,
             processing_status: 'pending',
-            email_parsed_data: orderData,
-            created_at: new Date(),
-            updated_at: new Date()
+            total_amount: totalAmount,
+            has_special_request: orderDetails.specialRequest || false,
+            special_request_details: orderDetails.specialRequest ? "Special request from customer" : null,
+            email_body: JSON.stringify(parsedData),
+            email_subject: emailMetadata.subject,
+            email_parsed_data: parsedData,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
         })
         .select()
         .single();
 
     if (orderError) {
-        throw new Error(`Order creation failed: ${orderError.message}`);
+        throw new Error(`Failed to create order: ${orderError.message}`);
     }
 
-    // Process order items
-    const orderItemsPromises = Object.entries(orderDetails.products).map(async ([productName, quantity]) => {
-        // Look up product by name for this manufacturer
-        const { data: product, error: productError } = await supabase
-            .from('products')
-            .select('id, price')
-            .eq('manufacturer_id', manufacturer.id)
-            .eq('name', productName)
-            .single();
+    // Only insert order items if we have any
+    if (itemsForInsert.length > 0) {
+        // Insert order items
+        const orderItems = itemsForInsert.map(item => ({
+            ...item,
+            order_id: orderData.id
+        }));
 
-        if (productError || !product) {
-            console.warn(`Product not found: ${productName}`);
-            return null;
+        const { error: itemsError } = await supabase
+            .from('order_items')
+            .insert(orderItems);
+
+        if (itemsError) {
+            throw new Error(`Failed to create order items: ${itemsError.message}`);
         }
-
-        const qty = parseInt(quantity.replace(/\D/g, ''));
-        return {
-            order_id: order.id,
-            product_id: product.id,
-            quantity: qty,
-            unit_price: product.price,
-            total_price: product.price * qty,
-            created_at: new Date()
-        };
-    });
-
-    // Wait for all product lookups and create order items
-    const orderItems = (await Promise.all(orderItemsPromises)).filter(Boolean);
-
-    if (orderItems.length === 0) {
-        throw new Error('No valid products found for order items');
-    }
-
-    const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
-
-    if (itemsError) {
-        throw new Error(`Order items creation failed: ${itemsError.message}`);
-    }
-
-    // Update order total amount
-    const totalAmount = orderItems.reduce((sum, item) => sum + Number(item.total_price), 0);
-    
-    const { error: updateError } = await supabase
-        .from('orders')
-        .update({ total_amount: totalAmount })
-        .eq('id', order.id);
-
-    if (updateError) {
-        console.error('Failed to update order total:', updateError);
     }
 
     return {
-        orderId: order.id,
-        itemsCount: orderItems.length,
-        totalAmount
+        orderId: orderData.id,
+        orderNumber: orderData.order_number,
+        itemsCount: itemsForInsert.length,
+        totalAmount: totalAmount,
+        hasSpecialRequest: orderDetails.specialRequest || false
     };
 } 

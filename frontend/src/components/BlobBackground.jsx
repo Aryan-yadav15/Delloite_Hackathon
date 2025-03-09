@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 
 export default function BlobBackground() {
   return (
-    <div className="absolute inset-0 overflow-hidden opacity-50 dark:opacity-20">
+    <div className="absolute inset-0 overflow-hidden opacity-50 dark:opacity-20 z-10">
       <motion.div
         animate={{
           scale: [1, 1.2, 1],

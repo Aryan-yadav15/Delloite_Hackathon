@@ -219,4 +219,30 @@ router.get('/manufacturer/:id', async (req, res) => {
   }
 });
 
+// GET single order with details
+router.get('/:id', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        retailers (id, business_name, email),
+        order_items (
+          id, 
+          quantity, 
+          unit_price, 
+          total_price,
+          products (id, name, sku)
+        )
+      `)
+      .eq('id', req.params.id)
+      .single();
+
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 export default router; 

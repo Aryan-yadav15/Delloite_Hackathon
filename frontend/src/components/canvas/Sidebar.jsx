@@ -1,88 +1,92 @@
 'use client'
 
-import { FaEnvelope, FaBox, FaExclamationTriangle, FaFileInvoiceDollar } from 'react-icons/fa'
+import React, { useState } from 'react';
+import { Separator } from "@/components/ui/separator";
+import NodePanel from './NodePanel';
+import { FaEnvelope, FaBox, FaExclamationTriangle, FaFileInvoiceDollar, FaCodeBranch, FaPercentage, FaBell } from 'react-icons/fa'
+import { Button } from '@/components/ui/button';
+import { PlayCircleIcon } from 'lucide-react';
 
-const nodeTypes = [
-  {
-    type: 'email',
-    label: 'Email Configuration',
-    description: 'Configure email tracking settings',
-    icon: <FaEnvelope className="w-6 h-6 text-blue-500" />,
-    color: 'border-blue-500',
-    order: 1,
-    canConnect: ['product']
-  },
-  {
-    type: 'product',
-    label: 'Product List',
-    description: 'Add products to track',
-    icon: <FaBox className="w-6 h-6 text-green-500" />,
-    color: 'border-green-500',
-    order: 2,
-    canConnect: ['exception', 'invoice']
-  },
-  {
-    type: 'exception',
-    label: 'Exception Products',
-    description: 'Configure product exceptions',
-    icon: <FaExclamationTriangle className="w-6 h-6 text-yellow-500" />,
-    color: 'border-yellow-500',
-    order: 3,
-    canConnect: ['invoice']
-  },
-  {
-    type: 'invoice',
-    label: 'Invoice Template',
-    description: 'Design invoice layout',
-    icon: <FaFileInvoiceDollar className="w-6 h-6 text-purple-500" />,
-    color: 'border-purple-500',
-    order: 4,
-    canConnect: []
-  }
-]
-
-export default function Sidebar() {
-  const onDragStart = (event, nodeType) => {
-    event.dataTransfer.setData('application/reactflow', nodeType)
-    event.dataTransfer.effectAllowed = 'move'
-  }
-
+export default function Sidebar({ onDragStart, onLoadDemoWorkflow }) {
+  const [activeCategory, setActiveCategory] = useState('all');
+  
+  const categories = [
+    { id: 'all', label: 'All Nodes' },
+    { id: 'input', label: 'Input' },
+    { id: 'process', label: 'Processing' },
+    { id: 'output', label: 'Output' }
+  ];
+  
+  const categoryMap = {
+    'input': ['email', 'product'],
+    'process': ['exception', 'conditional', 'price_adjustment', 'vip'],
+    'output': ['invoice', 'notification']
+  };
+  
   return (
-    <aside className="w-64 bg-white border-r p-4">
-      <div className="mb-6">
-        <h3 className="text-sm font-semibold mb-2">Workflow Nodes</h3>
-        <p className="text-sm text-gray-500">Build your workflow in order: Email → Products → Exceptions → Invoice</p>
-      </div>
-      
-      <div className="space-y-4">
-        {nodeTypes.map((node) => (
-          <div
-            key={node.type}
-            className={`p-4 border-l-4 ${node.color} bg-white rounded-lg shadow-sm cursor-move 
-              hover:shadow-md transition-all duration-200 ease-in-out`}
-            onDragStart={(e) => onDragStart(e, node.type)}
-            draggable
+    <div className="h-full flex flex-col bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 w-[220px]">
+      {/* Categories */}
+      <div className="flex items-center p-2 gap-1 overflow-x-auto no-scrollbar">
+        {categories.map(category => (
+          <button
+            key={category.id}
+            onClick={() => setActiveCategory(category.id)}
+            className={`
+              px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap
+              transition-colors duration-200
+              ${activeCategory === category.id 
+                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' 
+                : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'}
+            `}
           >
-            <div className="flex items-center space-x-3">
-              {node.icon}
-              <div>
-                <h3 className="font-medium text-gray-800">{node.label}</h3>
-                <p className="text-sm text-gray-500">{node.description}</p>
-              </div>
-            </div>
-          </div>
+            {category.label}
+          </button>
         ))}
       </div>
-
-      <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-        <h3 className="text-sm font-medium text-gray-700 mb-2">Workflow Rules</h3>
-        <ul className="text-xs text-gray-500 space-y-2">
-          <li>• Start with Email Configuration</li>
-          <li>• Add Product List next</li>
-          <li>• Optional: Add Exceptions</li>
-          <li>• End with Invoice Template</li>
+      
+      <Separator />
+      
+      {/* Filtered Node Panel */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <NodePanel 
+          onDragStart={onDragStart} 
+          filter={activeCategory === 'all' ? null : categoryMap[activeCategory]}
+        />
+      </div>
+      
+      {/* Demo Workflow Button */}
+      <div className="p-3 border-t border-gray-200 dark:border-gray-700">
+        <Button 
+          onClick={onLoadDemoWorkflow}
+          className="w-full bg-indigo-500 hover:bg-indigo-600 text-white flex items-center justify-center gap-2"
+          size="sm"
+        >
+          <PlayCircleIcon className="h-4 w-4" />
+          <span>Load Demo Workflow</span>
+        </Button>
+        <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-2 text-center">
+          Start with a pre-built workflow template
+        </p>
+      </div>
+      
+      {/* Tips Section */}
+      <div className="p-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+        <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Quick Tips</h3>
+        <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1.5">
+          <li className="flex items-start gap-2">
+            <span className="text-blue-500 text-lg leading-none">•</span>
+            <span>Drag nodes onto the canvas</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-blue-500 text-lg leading-none">•</span>
+            <span>Connect nodes by dragging between handles</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-blue-500 text-lg leading-none">•</span>
+            <span>Configure nodes by clicking on them</span>
+          </li>
         </ul>
       </div>
-    </aside>
-  )
+    </div>
+  );
 } 
