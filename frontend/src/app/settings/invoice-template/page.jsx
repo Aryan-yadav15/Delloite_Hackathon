@@ -6,18 +6,16 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/toast'
 import { useSupabase } from '@/lib/supabase'
 import { useManufacturer } from '@/hooks/useManufacturer'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
-import { useToast } from '@/components/ui/use-toast'
 import { Badge } from '@/components/ui/badge'
 
 export default function InvoiceTemplatePage() {
   const supabase = useSupabase()
   const { manufacturer } = useManufacturer()
-  const { toast } = useToast()
   
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -111,10 +109,7 @@ export default function InvoiceTemplatePage() {
         variant: 'destructive'
       })
     } else {
-      toast({
-        title: 'Success',
-        description: 'Invoice template saved successfully'
-      })
+      toast.success('Invoice template saved successfully')
     }
   }
   
@@ -164,10 +159,7 @@ export default function InvoiceTemplatePage() {
       logo_url: publicUrl
     })
     
-    toast({
-      title: 'Success',
-      description: 'Logo uploaded successfully'
-    })
+    toast.success('Logo uploaded successfully')
   }
   
   const handlePreview = async () => {
