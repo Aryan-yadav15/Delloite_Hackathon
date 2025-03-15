@@ -126,12 +126,12 @@ async function processOrder(req, res) {
 
     // Always check both parser flag and special request
     const HF_API_URL = 'https://api-inference.huggingface.co/models/harshitme08/email-classifier-distilbert';
-    const HF_TOKEN = 'REDACTEDwmxkLiUvHDlfscwQZcAEQjUOVGaeKcfOSJ';
+    const hfToken = process.env.HUGGINGFACE_TOKEN;  // Get from environment
 
     const hfResponse = await fetch(HF_API_URL, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${HF_TOKEN}`,
+        'Authorization': `Bearer ${hfToken}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ inputs: emailText })
