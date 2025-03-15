@@ -171,22 +171,29 @@ export default function InvoiceTemplatePage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           manufacturerId: manufacturer.id,
           template
         }),
       })
       
       if (response.ok) {
-        // Create a URL for the blob
+        // Create a URL for the blob (PDF blob now)
         const blob = await response.blob()
         const url = window.URL.createObjectURL(blob)
         
-        // Open in new tab
+        // Open in new tab (should work for PDF)
         window.open(url, '_blank')
         
         // Clean up
         window.URL.revokeObjectURL(url)
+      } else {
+        console.error("Error previewing invoice:", response.statusText)
+        toast({
+          title: 'Error',
+          description: 'Failed to generate invoice preview',
+          variant: 'destructive'
+        })
       }
     } catch (error) {
       console.error("Error previewing invoice:", error)

@@ -3,7 +3,7 @@
 import React from 'react'
 import { Handle, Position } from 'reactflow'
 import { useWorkflow } from '@/context/WorkflowContext'
-import { FaEnvelope, FaBox, FaExclamationTriangle, FaFileInvoiceDollar, FaRandom, FaMoneyBillWave, FaBell } from 'react-icons/fa'
+import { FaEnvelope, FaBox, FaExclamationTriangle, FaFileInvoiceDollar, FaRandom, FaMoneyBillWave, FaBell, FaUsers } from 'react-icons/fa'
 import EmailConfigModal from './modals/EmailConfigModal'
 import ProductConfigModal from './modals/ProductConfigModal'
 import ExceptionConfigModal from './modals/ExceptionConfigModal'
@@ -12,6 +12,7 @@ import ConditionalConfigModal from './modals/ConditionalConfigModal'
 import PriceAdjustmentConfigModal from './modals/PriceAdjustmentConfigModal'
 import NotificationConfigModal from './modals/NotificationConfigModal'
 import { CheckCircle2 } from "lucide-react"
+import RetailerGroupNode from './nodes/RetailerGroupNode'
 
 const icons = {
   email: <FaEnvelope className="w-5 h-5 text-blue-500" />,
@@ -20,7 +21,8 @@ const icons = {
   invoice: <FaFileInvoiceDollar className="w-5 h-5 text-purple-500" />,
   conditional: <FaRandom className="w-5 h-5 text-red-500" />,
   price_adjustment: <FaMoneyBillWave className="w-5 h-5 text-teal-500" />,
-  notification: <FaBell className="w-5 h-5 text-orange-500" />
+  notification: <FaBell className="w-5 h-5 text-orange-500" />,
+  retailer_group: <FaUsers className="w-5 h-5 text-purple-500" />
 }
 
 const colors = {
@@ -30,7 +32,8 @@ const colors = {
   invoice: 'border-purple-500 bg-purple-50',
   conditional: 'border-orange-500 bg-orange-50',
   price_adjustment: 'border-pink-500 bg-pink-50',
-  notification: 'border-indigo-500 bg-indigo-50'
+  notification: 'border-indigo-500 bg-indigo-50',
+  retailer_group: 'border-purple-500 bg-purple-50'
 }
 
 const nodeIcons = {
@@ -53,6 +56,11 @@ const modalComponents = {
   notification: NotificationConfigModal
 }
 
+const nodeTypes = {
+  customNode: CustomNode,
+  retailerGroup: RetailerGroupNode
+}
+
 export default function CustomNode({ id, data, isConnectable, selected }) {
   const { setSelectedNode } = useWorkflow()
   
@@ -70,7 +78,8 @@ export default function CustomNode({ id, data, isConnectable, selected }) {
     invoice: [],
     conditional: ['email', 'product', 'exception', 'invoice', 'price_adjustment', 'notification'],
     price_adjustment: ['invoice', 'notification'],
-    notification: []
+    notification: [],
+    retailer_group: ['conditional', 'price_adjustment', 'notification', 'invoice']
   }
 
   // Get handle style based on node type

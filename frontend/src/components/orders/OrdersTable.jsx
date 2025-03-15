@@ -25,7 +25,7 @@ export function OrdersTable({ data = [], isLoading }) {
     router.push(`/orders/${orderId}`)
   }
 
-  const downloadInvoice = async (order) => {
+  const handleDownloadInvoice = async (order) => {
     if (!manufacturer?.id) {
       toast.error("User information not available")
       return
@@ -45,14 +45,14 @@ export function OrdersTable({ data = [], isLoading }) {
       })
       
       if (response.ok) {
-        // Create a URL for the blob
+        // Create a URL for the blob (PDF blob now)
         const blob = await response.blob()
         const url = window.URL.createObjectURL(blob)
         
-        // Create a link and trigger download
+        // Create a link and trigger download (filename will be .pdf now)
         const a = document.createElement('a')
         a.href = url
-        a.download = `invoice-${order.order_number || order.id}.txt`
+        a.download = `invoice-${order.order_number || order.id}.pdf` // Download as PDF
         document.body.appendChild(a)
         a.click()
         
@@ -62,9 +62,15 @@ export function OrdersTable({ data = [], isLoading }) {
         
         toast.success("Invoice downloaded successfully")
       } else {
-        const errorData = await response.json()
-        console.error("Error response:", errorData)
-        toast.error(errorData.error || "Failed to download invoice")
+        try {
+          const errorData = await response.json()
+          console.error("Error response:", errorData)
+          toast.error(errorData.error || "Failed to download invoice")
+        } catch (jsonError) {
+          // Handle cases where response is not JSON (e.g., HTML error page)
+          console.error("Non-JSON error response:", response.statusText)
+          toast.error("Failed to download invoice. Server error.")
+        }
       }
     } catch (error) {
       console.error("Error downloading invoice:", error)
@@ -140,7 +146,7 @@ export function OrdersTable({ data = [], isLoading }) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => downloadInvoice(order)}
+            onClick={() => handleDownloadInvoice(order)}
             disabled={downloadingId === order.id}
             className="flex items-center gap-1"
           >
@@ -179,7 +185,7 @@ export function OrdersTable({ data = [], isLoading }) {
                   View Details
                 </DropdownMenuItem>
                 <DropdownMenuItem 
-                  onClick={() => downloadInvoice(order)}
+                  onClick={() => handleDownloadInvoice(order)}
                   disabled={downloadingId === order.id}
                 >
                   {downloadingId === order.id ? (

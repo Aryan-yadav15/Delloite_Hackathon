@@ -69,6 +69,50 @@ router.post('/', async (req, res) => {
       throw new Error(`Retailer lookup failed: ${rError?.message || 'Not found'}`);
     }
 
+    // Add this after retailer lookup
+    const { data: groupMemberships } = await supabase
+      .from('retailer_group_members')
+      .select('groups(id, name, rules)')
+      .eq('retailer_id', retailer.id);
+
+    const groupRules = {
+      regions: [],
+      tiers: [],
+      volume: []
+    };
+
+    groupMemberships.forEach(membership => {
+      const group = membership.groups;
+      if (group.name.startsWith('region-')) {
+        groupRules.regions.push(group.rules);
+      } else if (group.name.startsWith('tier-')) {
+        groupRules.tiers.push(group.rules);
+      } else if (group.name.startsWith('volume-')) {
+        groupRules.volume.push(group.rules);
+      }
+    });
+
+    // Apply group rules to order processing
+    if (groupRules.regions.length > 0) {
+      applyRegionalPricing(orderDetails, groupRules.regions);
+    }
+
+    if (groupRules.tiers.length > 0) {
+      applyTierDiscounts(orderDetails, groupRules.tiers);
+    }
+
+    if (groupRules.volume.length > 0) {
+      applyVolumeBonuses(orderDetails, groupRules.volume);
+    }
+
+    // When processing orders, check retailer group membership
+    const { data: groupMembership } = await supabase
+      .from('retailer_group_members')
+      .select('group_id')
+      .eq('retailer_id', retailer.id);
+
+    // Then determine processing path based on group IDs
+
     // Create order
     console.log('🛒 Creating order...');
     const orderPayload = {
@@ -80,6 +124,9 @@ router.post('/', async (req, res) => {
       email_received_at: new Date(emailMetadata.timestamp),
       processing_status: 'pending',
       email_parsed_data: req.body,
+      has_special_request: orderDetails.specialRequest || false,
+      special_request_confidence: orderDetails.specialRequestConfidence || 0,
+      parser_flag: orderDetails.products && orderDetails.products.flag ? orderDetails.products.flag : 0,
       created_at: new Date(),
       updated_at: new Date()
     };

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import pdfMake from 'pdfmake/build/pdfmake';
+import * as pdfFonts from 'pdfmake/build/vfs_fonts';
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -7,10 +9,18 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 )
 
+// Set up pdfMake with default fonts
+pdfMake.vfs = pdfFonts.pdfMake ? pdfFonts.pdfMake.vfs : pdfFonts.vfs;
+
+// Next.js route handler
 export async function POST(request) {
   try {
-    // Get data from request
-    const { orderId, manufacturerId } = await request.json()
+    // Get URL parameters from request
+    const url = new URL(request.url);
+    const orderId = url.pathname.split('/').pop();
+    
+    // Get data from request body
+    const { manufacturerId } = await request.json();
     
     if (!orderId || !manufacturerId) {
       return NextResponse.json(
@@ -83,48 +93,85 @@ export async function POST(request) {
     // Format date
     const orderDate = new Date(order.created_at).toLocaleDateString();
     const generatedDate = new Date().toLocaleString();
-    
-    // Generate TEXT invoice
-    const textInvoice = `
-      INVOICE ${order.order_number}
-      Date: ${orderDate}
-      
-      FROM: ${manufacturer.company_name}
-      ${manufacturer.address || ''}
-      ${manufacturer.email || ''}
-      
-      BILL TO: ${retailer.business_name}
-      ${retailer.address || ''}
-      ${retailer.email}
-      
-      ITEMS:
-      ${orderItems.map(item => `
-      - ${item.products?.name || 'Unknown Product'} (${item.products?.sku || 'N/A'})
-        Qty: ${item.quantity} @ $${item.unit_price.toFixed(2)} = $${item.total_price.toFixed(2)}
-      `).join('')}
-      
-      TOTAL: $${order.total_amount.toFixed(2)}
-      
-      Generated on ${generatedDate}
-    `;
 
-    // Return the text as a downloadable file
-    return new Response(textInvoice, {
-      status: 200,
-      headers: {
-        'Content-Type': 'text/plain',
-        'Content-Disposition': `attachment; filename="invoice-${order.order_number}.txt"`,
-        'Cache-Control': 'no-cache'
+    // Create table body for items
+    const tableBody = [
+      ['Item #', 'Description', 'Quantity', 'Unit Price', 'Total'], // Header
+    ];
+    
+    // Add item rows
+    orderItems.forEach((item, index) => {
+      tableBody.push([
+        (index + 1).toString(),
+        item.products?.name || 'Unknown Product',
+        item.quantity.toString(),
+        `$${item.unit_price.toFixed(2)}`,
+        `$${item.total_price.toFixed(2)}`
+      ]);
+    });
+    
+    // Add total row
+    tableBody.push(['', '', '', 'Subtotal:', `$${order.total_amount.toFixed(2)}`]);
+
+    // Very simple PDF document definition
+    const documentDefinition = {
+      content: [
+        { text: 'INVOICE', fontSize: 22, margin: [0, 0, 0, 10] },
+        { text: `Order #: ${order.order_number || 'N/A'}`, margin: [0, 0, 0, 5] },
+        { text: `Date: ${orderDate}`, margin: [0, 0, 0, 10] },
+        
+        { text: 'From:', fontSize: 14, margin: [0, 10, 0, 5] },
+        { text: manufacturer.company_name || 'Your Company' },
+        { text: manufacturer.address || 'Company Address' },
+        { text: manufacturer.email || 'company@email.com', margin: [0, 0, 0, 10] },
+        
+        { text: 'Bill To:', fontSize: 14, margin: [0, 10, 0, 5] },
+        { text: retailer.business_name || 'Client Name' },
+        { text: retailer.address || 'Client Address' },
+        { text: retailer.email || 'client@email.com', margin: [0, 0, 0, 10] },
+        
+        { text: 'Items:', fontSize: 14, margin: [0, 10, 0, 5] },
+        {
+          table: {
+            headerRows: 1,
+            widths: ['auto', '*', 'auto', 'auto', 'auto'],
+            body: tableBody
+          }
+        },
+        
+        { text: 'Notes:', fontSize: 14, margin: [0, 10, 0, 5] },
+        { text: manufacturer.invoice_template?.additional_notes || 'Terms and conditions, payment instructions, etc.' },
+        
+        { text: `Generated on ${generatedDate}`, fontSize: 8, alignment: 'right', margin: [0, 20, 0, 0] }
+      ],
+      defaultStyle: {
+        fontSize: 10
       }
+    };
+
+    // Generate PDF
+    const pdfDocGenerator = pdfMake.createPdf(documentDefinition);
+    
+    return new Promise((resolve, reject) => {
+      pdfDocGenerator.getBuffer((buffer) => {
+        resolve(new Response(buffer, {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename="invoice-${order.order_number || orderId}.pdf"`,
+            'Cache-Control': 'no-cache'
+          }
+        }));
+      });
     });
 
   } catch (error) {
     console.error('Invoice generation error:', error);
     return NextResponse.json(
-      { 
-        error: 'Failed to generate invoice', 
+      {
+        error: 'Failed to generate invoice',
         message: error.message
-      }, 
+      },
       { status: 500 }
     );
   }

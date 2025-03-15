@@ -62,7 +62,7 @@ export default function Sidebar({ onDragStart, onLoadDemoWorkflow }) {
           size="sm"
         >
           <PlayCircleIcon className="h-4 w-4" />
-          <span>Load Demo Workflow</span>
+          <span>Load Order Processing Workflow</span>
         </Button>
         <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-2 text-center">
           Start with a pre-built workflow template

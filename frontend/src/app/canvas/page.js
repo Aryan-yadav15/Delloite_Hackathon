@@ -38,10 +38,19 @@ import NotificationConfigModal from "@/components/canvas/modals/NotificationConf
 import NodeConfigModal from '@/components/canvas/modals/NodeConfigModal'
 import FlowEdge from '@/components/canvas/FlowEdge';
 import ConnectionLine from '@/components/canvas/ConnectionLine'
+import { orderProcessingWorkflow } from "@/components/canvas/DemoWorkflow";
 
 // Define node types
 const nodeTypes = {
   customNode: CustomNode,
+  email: CustomNode,
+  product: CustomNode,
+  exception: CustomNode,
+  invoice: CustomNode,
+  conditional: CustomNode,
+  price_adjustment: CustomNode,
+  notification: CustomNode,
+  vip: CustomNode
 };
 
 // Define edge types
@@ -453,94 +462,20 @@ export default function Page() {
   };
 
   // Add the demo workflow handler function
-  const loadDemoWorkflow = useCallback(() => {
-    // Create a simple demo workflow
-    const demoNodes = [
-      {
-        id: 'email-1',
-        type: 'customNode',
-        position: { x: 250, y: 100 },
-        data: {
-          type: 'email',
-          label: 'Email Parser',
-          description: 'Processes incoming emails',
-          configured: true,
-          manufacturer_id: manufacturer?.id
-        }
-      },
-      {
-        id: 'product-1',
-        type: 'customNode',
-        position: { x: 500, y: 250 },
-        data: {
-          type: 'product',
-          label: 'Product Type',
-          description: 'Identifies product categories',
-          configured: true,
-          manufacturer_id: manufacturer?.id
-        }
-      },
-      {
-        id: 'conditional-1',
-        type: 'customNode',
-        position: { x: 750, y: 100 },
-        data: {
-          type: 'conditional',
-          label: 'Sender Type Check',
-          description: 'Routes based on sender',
-          configured: true,
-          manufacturer_id: manufacturer?.id
-        }
-      },
-      {
-        id: 'exception-1',
-        type: 'customNode',
-        position: { x: 750, y: 400 },
-        data: {
-          type: 'exception',
-          label: 'Extract VIP Products',
-          description: 'Special product handling',
-          configured: true,
-          manufacturer_id: manufacturer?.id
-        }
-      },
-    ];
-
-    const demoEdges = [
-      {
-        id: 'edge-email-1-conditional-1',
-        source: 'email-1',
-        target: 'conditional-1',
-        type: 'default',
-        animated: true,
-        style: { stroke: '#4F46E5', strokeWidth: 2 }
-      },
-      {
-        id: 'edge-email-1-product-1',
-        source: 'email-1',
-        target: 'product-1',
-        type: 'default',
-        animated: true,
-        style: { stroke: '#4F46E5', strokeWidth: 2 }
-      },
-      {
-        id: 'edge-product-1-exception-1',
-        source: 'product-1',
-        target: 'exception-1',
-        type: 'default',
-        animated: true,
-        style: { stroke: '#4F46E5', strokeWidth: 2 }
-      }
-    ];
-
-    setNodes(demoNodes);
-    setEdges(demoEdges);
+  const handleLoadDemoWorkflow = () => {
+    // Load the orderProcessingWorkflow
+    const workflow = orderProcessingWorkflow;
     
-    toast.success("Demo workflow loaded successfully!", {
-      duration: 3000,
-      position: "bottom-right"
-    });
-  }, [manufacturer]);
+    // Clear existing nodes and edges
+    setNodes([]);
+    setEdges([]);
+    
+    // Add timeout to ensure UI updates before adding new elements
+    setTimeout(() => {
+      setNodes(workflow.nodes);
+      setEdges(workflow.edges);
+    }, 50);
+  };
 
   if (!isLoaded || isLoadingManufacturer) {
     return <div>Loading...</div>;
@@ -683,7 +618,7 @@ export default function Page() {
                       event.dataTransfer.setData('application/reactflow', nodeType);
                       event.dataTransfer.effectAllowed = 'move';
                     }}
-                    onLoadDemoWorkflow={loadDemoWorkflow} 
+                    onLoadDemoWorkflow={handleLoadDemoWorkflow} 
                   />
                 </Panel>
               </ReactFlow>

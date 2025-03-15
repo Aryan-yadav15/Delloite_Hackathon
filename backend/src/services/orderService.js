@@ -72,6 +72,8 @@ export async function createOrder(parsedData) {
             processing_status: 'pending',
             total_amount: totalAmount,
             has_special_request: orderDetails.specialRequest || false,
+            special_request_confidence: orderDetails.specialRequestConfidence || 0,
+            parser_flag: orderDetails.parserFlag || 0,
             special_request_details: orderDetails.specialRequest ? "Special request from customer" : null,
             email_body: JSON.stringify(parsedData),
             email_subject: emailMetadata.subject,

@@ -55,7 +55,8 @@ export default function ConditionalConfigForm({ onSave, initialData }) {
     { id: "retailer", label: "Retailer" },
     { id: "product", label: "Product" },
     { id: "order_value", label: "Order Value" },
-    { id: "order_quantity", label: "Order Quantity" }
+    { id: "order_quantity", label: "Order Quantity" },
+    { id: "retailer_group", label: "Retailer Group" }
   ];
 
   const operatorOptions = {
@@ -76,6 +77,10 @@ export default function ConditionalConfigForm({ onSave, initialData }) {
       { id: "greater_than", label: "Greater Than" },
       { id: "less_than", label: "Less Than" },
       { id: "equals", label: "Equals" }
+    ],
+    retailer_group: [
+      { id: "in_group", label: "Is In Group" },
+      { id: "not_in_group", label: "Is Not In Group" }
     ]
   };
 
@@ -168,6 +173,27 @@ export default function ConditionalConfigForm({ onSave, initialData }) {
               onChange={(e) => setCondition({...condition, value: e.target.value})}
               placeholder={condition.conditionType === "order_value" ? "Enter amount" : "Enter quantity"}
             />
+          </div>
+        )}
+        
+        {condition.conditionType === "retailer_group" && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Select Retailer Group</label>
+            <Select
+              value={condition.entityId}
+              onValueChange={(value) => setCondition({...condition, entityId: value})}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select group" />
+              </SelectTrigger>
+              <SelectContent>
+                {retailers.map(group => (
+                  <SelectItem key={group.id} value={group.id.toString()}>
+                    {group.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         )}
         
